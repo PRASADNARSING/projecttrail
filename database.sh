@@ -16,6 +16,7 @@ if [ ! -d "$LOGS_FOLDER" ]; then
     mkdir -p "$LOGS_FOLDER"
     echo "Directory $LOGS_FOLDER created."
 fi
+#starts
 
 VALIDATE(){
     if [ $1 -ne 0 ]
