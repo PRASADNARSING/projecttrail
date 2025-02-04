@@ -46,8 +46,8 @@ echo "Checking if Node.js is installed..." | tee -a "$LOG_FILE_NAME"
 if ! command -v node &>/dev/null
 then
     echo "Node.js is not installed. Installing now..." | tee -a "$LOG_FILE_NAME"
-    curl -sL https://deb.nodesource.com/setup_16.x | sudo -E bash -
-    sudo apt-get install -y nodejs
+    curl -sL https://rpm.nodesource.com/setup_16.x | sudo -E bash -
+    sudo yum install -y nodejs
     VALIDATE $? "Node.js installation"
 else
     echo "Node.js is already installed." | tee -a "$LOG_FILE_NAME"
@@ -80,7 +80,7 @@ echo "Checking if Nginx is installed..." | tee -a "$LOG_FILE_NAME"
 if ! command -v nginx &>/dev/null
 then
     echo "Nginx is not installed. Installing now..." | tee -a "$LOG_FILE_NAME"
-    sudo apt-get install -y nginx
+    sudo yum install -y nginx
     VALIDATE $? "Nginx installation"
 else
     echo "Nginx is already installed." | tee -a "$LOG_FILE_NAME"
