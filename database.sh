@@ -1,3 +1,5 @@
+#!/bin/bash
+
 USERID=$(id -u)
 R="\e[31m"  # Red for errors
 G="\e[32m"  # Green for success
@@ -68,10 +70,13 @@ VALIDATE $? "Enabling MySQL service"
 if mysql -u root -e "SELECT 1" &>> "$LOG_FILE_NAME"; then
     echo "MySQL root password is already set." | tee -a "$LOG_FILE_NAME"
 else
-    # Set MySQL root password to Shashi@123 directly
+    # Set MySQL root password using ALTER USER command
     MYSQL_ROOT_PASS="Shashi@123!"
     echo "Setting MySQL root password..." | tee -a "$LOG_FILE_NAME"
-    sudo mysqladmin -u root password "$MYSQL_ROOT_PASS" &>> "$LOG_FILE_NAME"
+    sudo mysql -u root <<EOF &>> "$LOG_FILE_NAME"
+    ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '$MYSQL_ROOT_PASS';
+    FLUSH PRIVILEGES;
+EOF
     VALIDATE $? "Setting MySQL root password"
 fi
 
