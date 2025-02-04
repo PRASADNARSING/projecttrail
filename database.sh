@@ -60,15 +60,22 @@ EOF
     
     sudo yum install -y mongodb-org &>> "$LOG_FILE_NAME"
     VALIDATE $? "MongoDB installation"
-    
+fi
+
+# Ensure MongoDB service is running
+if ! systemctl is-active --quiet mongod; then
     sudo systemctl start mongod &>> "$LOG_FILE_NAME"
     VALIDATE $? "Starting MongoDB service"
-    
-    sudo systemctl enable mongod &>> "$LOG_FILE_NAME"
-    VALIDATE $? "Enabling MongoDB service"
 else
-    echo "MongoDB is already installed." | tee -a "$LOG_FILE_NAME"
+    echo "MongoDB service is already running." | tee -a "$LOG_FILE_NAME"
 fi
+
+sudo systemctl enable mongod &>> "$LOG_FILE_NAME"
+VALIDATE $? "Enabling MongoDB service"
+
+# Check if MongoDB is accessible before creating collections
+mongo --eval "db.runCommand({ ping: 1 })" &> /dev/null
+VALIDATE $? "Checking MongoDB connection"
 
 # Create database and collections
 mongo <<EOF &>> "$LOG_FILE_NAME"
@@ -77,3 +84,4 @@ if (!db.getCollectionNames().includes("users")) { db.createCollection("users"); 
 if (!db.getCollectionNames().includes("travelPackages")) { db.createCollection("travelPackages"); }
 print("Database and collections verified.");
 EOF
+
