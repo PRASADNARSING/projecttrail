@@ -44,14 +44,23 @@ DB_NAME="touristPackages"
 MONGO_URI="mongodb://localhost:27017/$DB_NAME"
 echo "Connecting to MongoDB at $MONGO_URI"
 
-# Install MongoDB if not installed
+# Install MongoDB if not installed (Amazon Linux uses yum)
 if ! command -v mongod &> /dev/null
 then
     echo "MongoDB is not installed. Installing now..."
-    sudo apt update
-    sudo apt install -y mongodb
-    sudo systemctl start mongodb
-    sudo systemctl enable mongodb
+    
+    sudo tee /etc/yum.repos.d/mongodb-org-6.0.repo > /dev/null <<EOF
+[mongodb-org-6.0]
+name=MongoDB Repository
+baseurl=https://repo.mongodb.org/yum/amazon/2/mongodb-org/6.0/x86_64/
+gpgcheck=1
+enabled=1
+gpgkey=https://www.mongodb.org/static/pgp/server-6.0.asc
+EOF
+    
+    sudo yum install -y mongodb-org
+    sudo systemctl start mongod
+    sudo systemctl enable mongod
     echo "MongoDB installation complete."
 else
     echo "MongoDB is already installed."
