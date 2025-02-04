@@ -1,10 +1,12 @@
+#!/bin/bash
+
 USERID=$(id -u)
 R="\e[31m"  # Red for errors
 G="\e[32m"  # Green for success
 Y="\e[33m"  # Yellow for warnings
 N="\e[0m"   # Reset color
 
-LOGS_FOLDER="/var/log/expense-logs"
+LOGS_FOLDER="/var/log/backend-logs"
 LOG_FILE=$(echo $0 | cut -d "." -f1 )
 TIMESTAMP=$(date +%Y-%m-%d-%H-%M-%S)
 LOG_FILE_NAME="$LOGS_FOLDER/$LOG_FILE-$TIMESTAMP.log"
@@ -33,11 +35,47 @@ CHECK_ROOT(){
     fi
 }
 
-mkdir server
-cd server
-npm init -y
-npm install express body-parser axios
+# Script execution log
+echo "Script started executing at: $TIMESTAMP" | tee -a "$LOG_FILE_NAME"
 
+# Check if the script is run as root
+CHECK_ROOT
+
+# Install Node.js
+if ! command -v node &> /dev/null
+then
+    echo "Node.js is not installed. Installing now..." | tee -a "$LOG_FILE_NAME"
+    curl -fsSL https://rpm.nodesource.com/setup_16.x | sudo bash - &>> "$LOG_FILE_NAME"
+    sudo yum install -y nodejs &>> "$LOG_FILE_NAME"
+    VALIDATE $? "Node.js installation"
+else
+    echo "Node.js is already installed." | tee -a "$LOG_FILE_NAME"
+fi
+
+# Create server directory
+SERVER_DIR="/home/ec2-user/server"
+if [ ! -d "$SERVER_DIR" ]; then
+    echo "Creating server directory..." | tee -a "$LOG_FILE_NAME"
+    mkdir -p "$SERVER_DIR"
+    VALIDATE $? "Creating server directory"
+else
+    echo "Server directory already exists." | tee -a "$LOG_FILE_NAME"
+fi
+
+# Initialize Node.js project
+echo "Initializing Node.js project..." | tee -a "$LOG_FILE_NAME"
+cd "$SERVER_DIR"
+npm init -y &>> "$LOG_FILE_NAME"
+VALIDATE $? "Initializing Node.js project"
+
+# Install dependencies
+echo "Installing dependencies..." | tee -a "$LOG_FILE_NAME"
+npm install express body-parser axios &>> "$LOG_FILE_NAME"
+VALIDATE $? "Installing dependencies"
+
+# Create server.js file
+echo "Creating server.js file..." | tee -a "$LOG_FILE_NAME"
+cat <<EOL > server.js
 const express = require('express');
 const bodyParser = require('body-parser');
 const axios = require('axios');
@@ -63,5 +101,32 @@ app.post('/get-suggestions', async (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`Server is running on http://localhost:${port}`);
+  console.log(\`Server is running on http://localhost:\${port}\`);
 });
+EOL
+VALIDATE $? "Creating server.js file"
+
+# Start the server using PM2
+if ! command -v pm2 &> /dev/null
+then
+    echo "PM2 is not installed. Installing now..." | tee -a "$LOG_FILE_NAME"
+    sudo npm install -g pm2 &>> "$LOG_FILE_NAME"
+    VALIDATE $? "PM2 installation"
+else
+    echo "PM2 is already installed." | tee -a "$LOG_FILE_NAME"
+fi
+
+echo "Starting the server using PM2..." | tee -a "$LOG_FILE_NAME"
+pm2 start server.js --name "backend" &>> "$LOG_FILE_NAME"
+VALIDATE $? "Starting server using PM2"
+
+# Save PM2 process list
+pm2 save &>> "$LOG_FILE_NAME"
+VALIDATE $? "Saving PM2 process list"
+
+# Set up PM2 to start on boot
+echo "Setting up PM2 to start on boot..." | tee -a "$LOG_FILE_NAME"
+pm2 startup &>> "$LOG_FILE_NAME"
+VALIDATE $? "Setting up PM2 startup"
+
+echo "Script execution completed at: $(date +%Y-%m-%d-%H-%M-%S)" | tee -a "$LOG_FILE_NAME"
