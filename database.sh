@@ -39,49 +39,62 @@ echo "Script started executing at: $TIMESTAMP" | tee -a "$LOG_FILE_NAME"
 # Check if the script is run as root
 CHECK_ROOT
 
-# Database Setup for MongoDB
+# Database Setup for MySQL
 DB_NAME="touristPackages"
-MONGO_URI="mongodb://localhost:27017/$DB_NAME"
-echo "Connecting to MongoDB at $MONGO_URI" | tee -a "$LOG_FILE_NAME"
+MYSQL_URI="mysql://localhost/$DB_NAME"
+echo "Connecting to MySQL at $MYSQL_URI" | tee -a "$LOG_FILE_NAME"
 
-# Install MongoDB if not installed (Amazon Linux uses yum)
-if ! command -v mongod &> /dev/null
+# Install MySQL if not installed (Amazon Linux uses yum)
+if ! command -v mysql &> /dev/null
 then
-    echo "MongoDB is not installed. Installing now..." | tee -a "$LOG_FILE_NAME"
+    echo "MySQL is not installed. Installing now..." | tee -a "$LOG_FILE_NAME"
     
-    sudo tee /etc/yum.repos.d/mongodb-org-6.0.repo > /dev/null <<EOF
-[mongodb-org-6.0]
-name=MongoDB Repository
-baseurl=https://repo.mongodb.org/yum/amazon/2/mongodb-org/6.0/x86_64/
-gpgcheck=1
-enabled=1
-gpgkey=https://www.mongodb.org/static/pgp/server-6.0.asc
-EOF
-    
-    sudo yum install -y mongodb-org &>> "$LOG_FILE_NAME"
-    VALIDATE $? "MongoDB installation"
+    sudo yum install -y mysql-server &>> "$LOG_FILE_NAME"
+    VALIDATE $? "MySQL installation"
 fi
 
-# Ensure MongoDB service is running
-if ! systemctl is-active --quiet mongod; then
-    sudo systemctl start mongod &>> "$LOG_FILE_NAME"
-    VALIDATE $? "Starting MongoDB service"
+# Ensure MySQL service is running
+if ! systemctl is-active --quiet mysqld; then
+    sudo systemctl start mysqld &>> "$LOG_FILE_NAME"
+    VALIDATE $? "Starting MySQL service"
 else
-    echo "MongoDB service is already running." | tee -a "$LOG_FILE_NAME"
+    echo "MySQL service is already running." | tee -a "$LOG_FILE_NAME"
 fi
 
-sudo systemctl enable mongod &>> "$LOG_FILE_NAME"
-VALIDATE $? "Enabling MongoDB service"
+sudo systemctl enable mysqld &>> "$LOG_FILE_NAME"
+VALIDATE $? "Enabling MySQL service"
 
-# Check if MongoDB is accessible before creating collections
-mongo --eval "db.runCommand({ ping: 1 })" &> /dev/null
-VALIDATE $? "Checking MongoDB connection"
+# Set MySQL root password to Shashi@123 if not set
+MYSQL_ROOT_PASS="Shashi@123"
+MYSQL_TEMP_PASS=$(sudo grep 'temporary password' /var/log/mysqld.log | tail -n 1 | awk '{print $NF}')
+if [ -n "$MYSQL_TEMP_PASS" ]; then
+    sudo mysqladmin -u root -p"$MYSQL_TEMP_PASS" password "$MYSQL_ROOT_PASS" &>> "$LOG_FILE_NAME"
+    VALIDATE $? "Setting MySQL root password"
+fi
 
-# Create database and collections
-mongo <<EOF &>> "$LOG_FILE_NAME"
-use $DB_NAME;
-if (!db.getCollectionNames().includes("users")) { db.createCollection("users"); }
-if (!db.getCollectionNames().includes("travelPackages")) { db.createCollection("travelPackages"); }
-print("Database and collections verified.");
+# Create database and tables
+mysql -u root -p"$MYSQL_ROOT_PASS" <<EOF &>> "$LOG_FILE_NAME"
+CREATE DATABASE IF NOT EXISTS $DB_NAME;
+USE $DB_NAME;
+
+-- Create users table
+CREATE TABLE IF NOT EXISTS users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create travelPackages table
+CREATE TABLE IF NOT EXISTS travelPackages (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    package_name VARCHAR(255) NOT NULL,
+    price DECIMAL(10,2) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Verify Database and Tables
+SHOW TABLES;
 EOF
 
+VALIDATE $? "Creating database and tables"
