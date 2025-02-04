@@ -46,12 +46,18 @@ echo "Checking if Node.js is installed..." | tee -a "$LOG_FILE_NAME"
 if ! command -v node &>/dev/null
 then
     echo "Node.js is not installed. Installing now..." | tee -a "$LOG_FILE_NAME"
+    
+    # Import the NodeSource GPG key manually
+    curl -fsSL https://rpm.nodesource.com/gpgkey/NODESOURCE-GPG-SIGNING-KEY-EL | sudo gpg --dearmor -o /etc/pki/rpm-gpg/NODESOURCE-GPG-SIGNING-KEY-EL
+
+    # Install Node.js using yum, disable GPG check
     curl -sL https://rpm.nodesource.com/setup_16.x | sudo -E bash -
-    sudo yum install -y nodejs
+    sudo yum --nogpgcheck install -y nodejs
     VALIDATE $? "Node.js installation"
 else
     echo "Node.js is already installed." | tee -a "$LOG_FILE_NAME"
 fi
+
 
 # Step 2: Install create-react-app globally (if not installed)
 echo "Checking if create-react-app is installed..." | tee -a "$LOG_FILE_NAME"
