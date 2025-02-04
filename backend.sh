@@ -45,11 +45,25 @@ CHECK_ROOT
 if ! command -v node &> /dev/null
 then
     echo "Node.js is not installed. Installing now..." | tee -a "$LOG_FILE_NAME"
+    # Remove existing Node.js (if any)
+    sudo yum remove -y nodejs &>> "$LOG_FILE_NAME"
+    # Download and run the NodeSource setup script
     curl -fsSL https://rpm.nodesource.com/setup_16.x | sudo bash - &>> "$LOG_FILE_NAME"
+    # Install Node.js
     sudo yum install -y nodejs &>> "$LOG_FILE_NAME"
     VALIDATE $? "Node.js installation"
 else
     echo "Node.js is already installed." | tee -a "$LOG_FILE_NAME"
+fi
+
+# Install PM2 (Process Manager for Node.js)
+if ! command -v pm2 &> /dev/null
+then
+    echo "PM2 is not installed. Installing now..." | tee -a "$LOG_FILE_NAME"
+    sudo npm install -g pm2 &>> "$LOG_FILE_NAME"
+    VALIDATE $? "PM2 installation"
+else
+    echo "PM2 is already installed." | tee -a "$LOG_FILE_NAME"
 fi
 
 # Create server directory
@@ -107,15 +121,6 @@ EOL
 VALIDATE $? "Creating server.js file"
 
 # Start the server using PM2
-if ! command -v pm2 &> /dev/null
-then
-    echo "PM2 is not installed. Installing now..." | tee -a "$LOG_FILE_NAME"
-    sudo npm install -g pm2 &>> "$LOG_FILE_NAME"
-    VALIDATE $? "PM2 installation"
-else
-    echo "PM2 is already installed." | tee -a "$LOG_FILE_NAME"
-fi
-
 echo "Starting the server using PM2..." | tee -a "$LOG_FILE_NAME"
 pm2 start server.js --name "backend" &>> "$LOG_FILE_NAME"
 VALIDATE $? "Starting server using PM2"
