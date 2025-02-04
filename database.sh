@@ -16,7 +16,6 @@ if [ ! -d "$LOGS_FOLDER" ]; then
     mkdir -p "$LOGS_FOLDER"
     echo "Directory $LOGS_FOLDER created."
 fi
-#starts
 
 VALIDATE(){
     if [ $1 -ne 0 ]
@@ -45,15 +44,17 @@ CHECK_ROOT
 # Database Setup for MySQL
 DB_NAME="touristPackages"
 MYSQL_URI="mysql://localhost/$DB_NAME"
+MYSQL_ROOT_PASS="Shashi@123!"
 echo "Connecting to MySQL at $MYSQL_URI" | tee -a "$LOG_FILE_NAME"
 
 # Install MySQL if not installed (Amazon Linux uses yum)
 if ! command -v mysql &> /dev/null
 then
     echo "MySQL is not installed. Installing now..." | tee -a "$LOG_FILE_NAME"
-    
     sudo yum install -y mysql-server &>> "$LOG_FILE_NAME"
     VALIDATE $? "MySQL installation"
+else
+    echo "MySQL is already installed." | tee -a "$LOG_FILE_NAME"
 fi
 
 # Ensure MySQL service is running
@@ -68,11 +69,10 @@ sudo systemctl enable mysqld &>> "$LOG_FILE_NAME"
 VALIDATE $? "Enabling MySQL service"
 
 # Check if MySQL root password is already set
-if mysql -u root -e "SELECT 1" &>> "$LOG_FILE_NAME"; then
+if mysql -u root -p"$MYSQL_ROOT_PASS" -e "SELECT 1" &>> "$LOG_FILE_NAME"; then
     echo "MySQL root password is already set." | tee -a "$LOG_FILE_NAME"
 else
     # Set MySQL root password using ALTER USER command
-    MYSQL_ROOT_PASS="Shashi@123!"
     echo "Setting MySQL root password..." | tee -a "$LOG_FILE_NAME"
     sudo mysql -u root <<EOF &>> "$LOG_FILE_NAME"
     ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '$MYSQL_ROOT_PASS';
@@ -81,29 +81,36 @@ EOF
     VALIDATE $? "Setting MySQL root password"
 fi
 
-# Create database and tables
-mysql -u root -p"$MYSQL_ROOT_PASS" <<EOF &>> "$LOG_FILE_NAME"
-CREATE DATABASE IF NOT EXISTS $DB_NAME;
-USE $DB_NAME;
+# Check if the database already exists
+if mysql -u root -p"$MYSQL_ROOT_PASS" -e "USE $DB_NAME;" &>> "$LOG_FILE_NAME"; then
+    echo "Database $DB_NAME already exists." | tee -a "$LOG_FILE_NAME"
+else
+    # Create database and tables
+    echo "Creating database and tables..." | tee -a "$LOG_FILE_NAME"
+    mysql -u root -p"$MYSQL_ROOT_PASS" <<EOF &>> "$LOG_FILE_NAME"
+    CREATE DATABASE $DB_NAME;
+    USE $DB_NAME;
 
--- Create users table
-CREATE TABLE IF NOT EXISTS users (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    email VARCHAR(255) UNIQUE NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+    -- Create users table
+    CREATE TABLE IF NOT EXISTS users (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
 
--- Create travelPackages table
-CREATE TABLE IF NOT EXISTS travelPackages (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    package_name VARCHAR(255) NOT NULL,
-    price DECIMAL(10,2) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+    -- Create travelPackages table
+    CREATE TABLE IF NOT EXISTS travelPackages (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        package_name VARCHAR(255) NOT NULL,
+        price DECIMAL(10,2) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
 
--- Verify Database and Tables
-SHOW TABLES;
+    -- Verify Database and Tables
+    SHOW TABLES;
 EOF
+    VALIDATE $? "Creating database and tables"
+fi
 
-VALIDATE $? "Creating database and tables"
+echo "Script execution completed at: $(date +%Y-%m-%d-%H-%M-%S)" | tee -a "$LOG_FILE_NAME"
