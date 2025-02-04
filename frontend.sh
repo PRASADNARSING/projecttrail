@@ -47,8 +47,10 @@ if ! command -v node &>/dev/null
 then
     echo "Node.js is not installed. Installing now..." | tee -a "$LOG_FILE_NAME"
     
-    # Import the NodeSource GPG key manually
-    curl -fsSL https://rpm.nodesource.com/gpgkey/NODESOURCE-GPG-SIGNING-KEY-EL | sudo gpg --dearmor -o /etc/pki/rpm-gpg/NODESOURCE-GPG-SIGNING-KEY-EL
+    # Import the NodeSource GPG key manually if not present
+    if [ ! -f /etc/pki/rpm-gpg/NODESOURCE-GPG-SIGNING-KEY-EL ]; then
+        curl -fsSL https://rpm.nodesource.com/gpgkey/NODESOURCE-GPG-SIGNING-KEY-EL | sudo gpg --dearmor -o /etc/pki/rpm-gpg/NODESOURCE-GPG-SIGNING-KEY-EL
+    fi
 
     # Install Node.js using yum, disable GPG check
     curl -sL https://rpm.nodesource.com/setup_16.x | sudo -E bash -
@@ -57,7 +59,6 @@ then
 else
     echo "Node.js is already installed." | tee -a "$LOG_FILE_NAME"
 fi
-
 
 # Step 2: Install create-react-app globally (if not installed)
 echo "Checking if create-react-app is installed..." | tee -a "$LOG_FILE_NAME"
@@ -70,16 +71,24 @@ else
     echo "create-react-app is already installed." | tee -a "$LOG_FILE_NAME"
 fi
 
-# Step 3: Create React app
-echo "Creating React app..." | tee -a "$LOG_FILE_NAME"
-npx create-react-app expense-frontend
-VALIDATE $? "React app creation"
+# Step 3: Create React app (if not already created)
+if [ ! -d "expense-frontend" ]; then
+    echo "Creating React app..." | tee -a "$LOG_FILE_NAME"
+    npx create-react-app expense-frontend
+    VALIDATE $? "React app creation"
+else
+    echo "React app already exists." | tee -a "$LOG_FILE_NAME"
+fi
 
-# Step 4: Build the React app
+# Step 4: Build the React app (only if not already built)
 echo "Building React app..." | tee -a "$LOG_FILE_NAME"
 cd expense-frontend
-npm run build
-VALIDATE $? "React app build"
+if [ ! -d "build" ]; then
+    npm run build
+    VALIDATE $? "React app build"
+else
+    echo "React app already built." | tee -a "$LOG_FILE_NAME"
+fi
 
 # Step 5: Install Nginx (if not installed)
 echo "Checking if Nginx is installed..." | tee -a "$LOG_FILE_NAME"
@@ -94,13 +103,21 @@ fi
 
 # Step 6: Configure Nginx to serve React app
 echo "Configuring Nginx to serve the React app..." | tee -a "$LOG_FILE_NAME"
-sudo cp -r build/* /usr/share/nginx/html/
-VALIDATE $? "Copying build files to Nginx"
+if [ ! -d "/usr/share/nginx/html/build" ]; then
+    sudo cp -r build/* /usr/share/nginx/html/
+    VALIDATE $? "Copying build files to Nginx"
+else
+    echo "Nginx is already configured with the React app." | tee -a "$LOG_FILE_NAME"
+fi
 
-# Step 7: Restart Nginx
+# Step 7: Restart Nginx (only if needed)
 echo "Restarting Nginx..." | tee -a "$LOG_FILE_NAME"
-sudo systemctl restart nginx
-VALIDATE $? "Restarting Nginx"
+if systemctl is-active --quiet nginx; then
+    sudo systemctl restart nginx
+    VALIDATE $? "Restarting Nginx"
+else
+    echo "Nginx is not running, skipping restart." | tee -a "$LOG_FILE_NAME"
+fi
 
 # Final message
 echo -e "$G Frontend deployment completed successfully! $N" | tee -a "$LOG_FILE_NAME"
