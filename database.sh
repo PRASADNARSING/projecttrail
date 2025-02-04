@@ -18,23 +18,23 @@ fi
 VALIDATE(){
     if [ $1 -ne 0 ]
     then
-        echo -e "$2 ... $R FAILURE $N"
+        echo -e "$2 ... $R FAILURE $N" | tee -a "$LOG_FILE_NAME"
         exit 1
     else
-        echo -e "$2 ... $G SUCCESS $N"
+        echo -e "$2 ... $G SUCCESS $N" | tee -a "$LOG_FILE_NAME"
     fi
 }
 
 CHECK_ROOT(){
     if [ $USERID -ne 0 ]
     then
-        echo "ERROR:: You must have sudo access to execute this script"
+        echo "ERROR:: You must have sudo access to execute this script" | tee -a "$LOG_FILE_NAME"
         exit 1 #other than 0
     fi
 }
 
 # Script execution log
-echo "Script started executing at: $TIMESTAMP" &>>$LOG_FILE_NAME
+echo "Script started executing at: $TIMESTAMP" | tee -a "$LOG_FILE_NAME"
 
 # Check if the script is run as root
 CHECK_ROOT
@@ -42,12 +42,12 @@ CHECK_ROOT
 # Database Setup for MongoDB
 DB_NAME="touristPackages"
 MONGO_URI="mongodb://localhost:27017/$DB_NAME"
-echo "Connecting to MongoDB at $MONGO_URI"
+echo "Connecting to MongoDB at $MONGO_URI" | tee -a "$LOG_FILE_NAME"
 
 # Install MongoDB if not installed (Amazon Linux uses yum)
 if ! command -v mongod &> /dev/null
 then
-    echo "MongoDB is not installed. Installing now..."
+    echo "MongoDB is not installed. Installing now..." | tee -a "$LOG_FILE_NAME"
     
     sudo tee /etc/yum.repos.d/mongodb-org-6.0.repo > /dev/null <<EOF
 [mongodb-org-6.0]
@@ -58,18 +58,22 @@ enabled=1
 gpgkey=https://www.mongodb.org/static/pgp/server-6.0.asc
 EOF
     
-    sudo yum install -y mongodb-org
-    sudo systemctl start mongod
-    sudo systemctl enable mongod
-    echo "MongoDB installation complete."
+    sudo yum install -y mongodb-org &>> "$LOG_FILE_NAME"
+    VALIDATE $? "MongoDB installation"
+    
+    sudo systemctl start mongod &>> "$LOG_FILE_NAME"
+    VALIDATE $? "Starting MongoDB service"
+    
+    sudo systemctl enable mongod &>> "$LOG_FILE_NAME"
+    VALIDATE $? "Enabling MongoDB service"
 else
-    echo "MongoDB is already installed."
+    echo "MongoDB is already installed." | tee -a "$LOG_FILE_NAME"
 fi
 
 # Create database and collections
-mongo <<EOF
+mongo <<EOF &>> "$LOG_FILE_NAME"
 use $DB_NAME;
-db.createCollection("users");
-db.createCollection("travelPackages");
-echo "Database and collections created."
+if (!db.getCollectionNames().includes("users")) { db.createCollection("users"); }
+if (!db.getCollectionNames().includes("travelPackages")) { db.createCollection("travelPackages"); }
+print("Database and collections verified.");
 EOF
