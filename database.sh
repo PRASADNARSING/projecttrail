@@ -64,13 +64,10 @@ fi
 sudo systemctl enable mysqld &>> "$LOG_FILE_NAME"
 VALIDATE $? "Enabling MySQL service"
 
-# Set MySQL root password to Shashi@123 if not set
+# Set MySQL root password to Shashi@123 directly
 MYSQL_ROOT_PASS="Shashi@123"
-MYSQL_TEMP_PASS=$(sudo grep 'temporary password' /var/log/mysqld.log | tail -n 1 | awk '{print $NF}')
-if [ -n "$MYSQL_TEMP_PASS" ]; then
-    sudo mysqladmin -u root -p"$MYSQL_TEMP_PASS" password "$MYSQL_ROOT_PASS" &>> "$LOG_FILE_NAME"
-    VALIDATE $? "Setting MySQL root password"
-fi
+sudo mysqladmin -u root password "$MYSQL_ROOT_PASS" &>> "$LOG_FILE_NAME"
+VALIDATE $? "Setting MySQL root password"
 
 # Create database and tables
 mysql -u root -p"$MYSQL_ROOT_PASS" <<EOF &>> "$LOG_FILE_NAME"
