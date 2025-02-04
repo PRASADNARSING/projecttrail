@@ -64,10 +64,16 @@ fi
 sudo systemctl enable mysqld &>> "$LOG_FILE_NAME"
 VALIDATE $? "Enabling MySQL service"
 
-# Set MySQL root password to Shashi@123 directly
-MYSQL_ROOT_PASS="Shashi@123"
-sudo mysqladmin -u root password "$MYSQL_ROOT_PASS" &>> "$LOG_FILE_NAME"
-VALIDATE $? "Setting MySQL root password"
+# Check if MySQL root password is already set
+if mysql -u root -e "SELECT 1" &>> "$LOG_FILE_NAME"; then
+    echo "MySQL root password is already set." | tee -a "$LOG_FILE_NAME"
+else
+    # Set MySQL root password to Shashi@123 directly
+    MYSQL_ROOT_PASS="Shashi@123!"
+    echo "Setting MySQL root password..." | tee -a "$LOG_FILE_NAME"
+    sudo mysqladmin -u root password "$MYSQL_ROOT_PASS" &>> "$LOG_FILE_NAME"
+    VALIDATE $? "Setting MySQL root password"
+fi
 
 # Create database and tables
 mysql -u root -p"$MYSQL_ROOT_PASS" <<EOF &>> "$LOG_FILE_NAME"
